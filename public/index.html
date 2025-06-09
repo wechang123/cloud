@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>오브젝트 스토리지</title>
+</head>
+<body>
+  <h1>오브젝트 스토리지 서비스</h1>
+
+  <!-- 로그인/회원가입 -->
+  <section>
+    <h2>1. 회원가입 / 로그인</h2>
+    <input id="username" placeholder="아이디" />
+    <input id="password" placeholder="비밀번호" type="password" />
+    <button onclick="register()">회원가입</button>
+    <button onclick="login()">로그인</button>
+  </section>
+
+  <!-- 파일 업로드 -->
+  <section>
+    <h2>2. 파일 업로드</h2>
+    <input type="file" id="uploadFile" />
+    <button onclick="uploadFile()">업로드</button>
+  </section>
+
+  <!-- 파일 목록 -->
+  <section>
+    <h2>3. 내 파일 목록</h2>
+    <button onclick="listFiles()">목록 불러오기</button>
+    <ul id="fileList"></ul>
+  </section>
+
+  <!-- 파일 접근 권한 설정 -->
+  <section>
+    <h2>4. 파일 접근 권한 설정</h2>
+    <input id="targetFileId" placeholder="파일 ID 입력" />
+    <select id="accessType">
+      <option value="public">공개</option>
+      <option value="private">비공개</option>
+      <option value="password">비밀번호 보호</option>
+    </select>
+    <input id="accessPassword" placeholder="비밀번호 (선택)" />
+    <button onclick="setPermission()">권한 설정</button>
+  </section>
+
+  <script>
+    let token = '';
+
+    function register() {
+      fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      }).then(res => res.json()).then(alertUser);
+    }
+
+    function login() {
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: document.getElementById('username').value,
+          password: document.getElementById('password').value
+        })
+      }).then(res => res.json()).then(data => {
+        if (data.token) {
+          token = data.token;
+          alert('로그인 성공');
+        } else alert('로그인 실패');
+      });
+    }
+
+    function uploadFile() {
+      const fileInput = document.getElementById('uploadFile');
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      fetch('/api/upload', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      }).then(res => res.json()).then(alertUser);
+    }
+
+    function listFiles() {
+      fetch('/api/files', {
+        headers: { Authorization: 'Bearer ' + token }
+      }).then(res => res.json()).then(files => {
+        const list = document.getElementById('fileList');
+        list.innerHTML = '';
+        files.forEach(f => {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            ${f.originalName} (${Math.round(f.size / 1024)} KB)
+            <a href="/download/${f.linkId}" target="_blank">다운로드</a>
+            <button onclick="deleteFile('${f.id}')">삭제</button>
+          `;
+          list.appendChild(li);
+        });
+      });
+    }
+
+    function deleteFile(id) {
+      fetch(`/api/files/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer ' + token }
+      }).then(res => res.json()).then(alertUser);
+    }
+
+    function setPermission() {
+      const fileId = document.getElementById('targetFileId').value;
+      const access = document.getElementById('accessType').value;
+      const password = document.getElementById('accessPassword').value;
+
+      const body = access === 'password'
+        ? { access, password }
+        : { access };
+
+      fetch(`/api/files/${fileId}/permission`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bearer ' + token
+        },
+        body: JSON.stringify(body)
+      }).then(res => res.json()).then(alertUser);
+    }
+
+    function alertUser(data) {
+      alert(JSON.stringify(data));
+    }
+  </script>
+</body>
+</html>
